@@ -12,17 +12,17 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.example.DAO.AccessLogDAO;
 import com.example.DAO.personasDAO;
+import com.example.demo.FractalEngine.Bounds;
 import com.example.demo.FractalEngine.FractalKind;
 import com.example.demo.FractalEngine.FractalPoint;
-import com.example.demo.FractalEngine.ZoomParams;
 import com.example.entity.accessLog;
 import com.example.entity.personaTable;
 
 @RestController
 public class DemoEndPoint {
 
-    private final AccessLogDAO  accessLogDAO  = new AccessLogDAO();
-    private final personasDAO   _personasDAO  = new personasDAO();
+    private final AccessLogDAO accessLogDAO = new AccessLogDAO();
+    private final personasDAO _personasDAO = new personasDAO();
     private final FractalEngine fractalEngine = new FractalEngine();
 
     // ── Unchanged endpoints ───────────────────────────────────────────────────
@@ -30,7 +30,7 @@ public class DemoEndPoint {
     @GetMapping("/hello")
     public String hello() {
         Charset utf8Charset = StandardCharsets.UTF_8;
-        String text         = "Hello, World! &#x25A0; &#x2261;";
+        String text = "Hello, World! &#x25A0; &#x2261;";
         byte[] encodedBytes = text.getBytes(utf8Charset);
         return new String(encodedBytes, utf8Charset);
     }
@@ -68,11 +68,11 @@ public class DemoEndPoint {
 
     @GetMapping("/GenerateRandomVertex_SpringBoot")
     public String GenerateRandomVertex_SpringBoot() {
-        int p_vertexSize  = 9;
-        int p_sampleSize  = 23;
+        int p_vertexSize = 9;
+        int p_sampleSize = 23;
         int p_sourcePoint = 0;
         try {
-            String text         = AlgorithmManager.generateRandomPoints(p_vertexSize, p_sampleSize, p_sourcePoint);
+            String text = AlgorithmManager.generateRandomPoints(p_vertexSize, p_sampleSize, p_sourcePoint);
             Charset utf8Charset = StandardCharsets.UTF_8;
             byte[] encodedBytes = text.getBytes(utf8Charset);
             return new String(encodedBytes, utf8Charset);
@@ -89,52 +89,51 @@ public class DemoEndPoint {
      *
      * Parameters
      * ──────────
-     * kind        — 1=Mandelbrot, 2=Julia, 3=Barnsley Fern
-     * zoomInOut   — true = zoom IN, false = zoom OUT
-     * zoomStep    — zoom factor (e.g. 1.5, 2.0). Pass 1.0 for no zoom.
-     * centerX     — complex-plane Re coordinate of the reticle center.
-     *               Defaults to the natural center of each fractal's view:
-     *                 Mandelbrot: -0.5   Julia: 0.0
-     *               The Angular UI sends the actual reticle position here.
-     * centerY     — complex-plane Im coordinate of the reticle center.
-     *               Defaults to 0.0 for both fractal types.
+     * kind — 1=Mandelbrot, 2=Julia, 3=Barnsley Fern
+     * xMin/xMax — complex-plane Re bounds of the current view window.
+     * yMin/yMax — complex-plane Im bounds of the current view window.
+     * Sent directly by Angular's applyZoomToBounds() — the
+     * server no longer derives the window from a zoom
+     * step/center transform, it just renders the window
+     * it's given. Optional: falls back to each fractal's
+     * default view (matching Angular's DEFAULT_BOUNDS_*)
+     * when omitted or invalid.
+     * maxIterations — escape-time iteration ceiling. Optional, defaults to 500.
+     * Ignored for Barnsley Fern (kind=3), which has no
+     * escape-time window or iteration ceiling.
      *
      * Examples
      * ────────
      * Default unzoomed Mandelbrot:
-     *   /api/fractals/generate?kind=1&zoomInOut=false&zoomStep=1.0
+     * /api/fractals/generate?kind=1
      *
-     * Zoom in 2× on Julia towards reticle at (-0.2, 0.3):
-     *   /api/fractals/generate?kind=2&zoomInOut=true&zoomStep=2.0&centerX=-0.2&centerY=0.3
-     *
-     * Backwards-compatible — existing calls without centerX/centerY continue
-     * to work using the default center values below.
+     * A zoomed Julia view:
+     * /api/fractals/generate?kind=2&xMin=-0.7&xMax=0.3&yMin=-0.2&yMax=0.8&maxIterations=500
      */
     @GetMapping("/api/fractals/generate")
     public ResponseEntity<List<FractalPoint>> getFractal(
-            @RequestParam int     kind,
-            @RequestParam boolean zoomInOut,
-            @RequestParam double  zoomStep,
-            @RequestParam(required = false) Double centerX,
-            @RequestParam(required = false) Double centerY
-    ) {
+            @RequestParam int kind,
+            @RequestParam(required = false) Double xMin,
+            @RequestParam(required = false) Double xMax,
+            @RequestParam(required = false) Double yMin,
+            @RequestParam(required = false) Double yMax,
+            @RequestParam(required = false) Integer maxIterations) {
         FractalKind fractalKind = FractalKind.fromValue(kind);
 
-        // Default centers per fractal type if the UI does not supply them.
-        // Mandelbrot's natural center is (-0.5, 0) — the centroid of its
-        // default view window [-2.0…1.0] × [-1.2…1.2].
-        // Julia's natural center is (0, 0) — centroid of [-1.5…1.5]².
-        double defaultCenterX = (fractalKind == FractalKind.MANDELBROT) ? -0.5 : 0.0;
-        double defaultCenterY = 0.0;
+        // Default bounds per fractal type if the client does not supply them —
+        // must match Angular's DEFAULT_BOUNDS_MANDELBROT / DEFAULT_BOUNDS_JULIA.
+        Bounds defaultBounds = (fractalKind == FractalKind.MANDELBROT)
+                ? new Bounds(-2.0, 1.0, -1.2, 1.2)
+                : new Bounds(-1.5, 1.5, -1.5, 1.5);
 
-        ZoomParams zoomParams = new ZoomParams(
-            zoomInOut,
-            zoomStep,
-            centerX != null ? centerX : defaultCenterX,
-            centerY != null ? centerY : defaultCenterY
-        );
+        boolean boundsSupplied = xMin != null && xMax != null && yMin != null && yMax != null;
+        Bounds bounds = boundsSupplied
+                ? new Bounds(xMin, xMax, yMin, yMax)
+                : defaultBounds;
 
-        List<FractalPoint> points = fractalEngine.getFractal(fractalKind, zoomParams);
+        int iterations = (maxIterations != null) ? maxIterations : 500;
+
+        List<FractalPoint> points = fractalEngine.getFractal(fractalKind, bounds, iterations);
         return ResponseEntity.ok(points);
     }
 }
