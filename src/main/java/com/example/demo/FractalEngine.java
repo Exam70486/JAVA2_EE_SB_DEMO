@@ -68,10 +68,9 @@ public class FractalEngine {
     // ─────────────────────────────────────────────────────────────────────────
     // CANVAS DIMENSIONS — single source of truth, must match Angular constants
     // ─────────────────────────────────────────────────────────────────────────
-    private static final int CANVAS_WIDTH = 800;
-    private static final int CANVAS_HEIGHT = 600;
-    private static final int MAX_ITERATIONS = 500;
-
+    private static final int CANVAS_WIDTH   = 800;
+    private static final int CANVAS_HEIGHT  = 600;
+    
     // ─────────────────────────────────────────────────────────────────────────
     // SHARED INTENSITY ENCODING
     // ─────────────────────────────────────────────────────────────────────────
