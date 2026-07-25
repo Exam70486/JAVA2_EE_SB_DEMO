@@ -129,6 +129,9 @@ echo "YOUR_PAT_HERE" | docker login --username apereznwogmail --password-stdin
 ## 4. docker push yourusername/your-repo:latest
 docker push apereznwogmail/java2_ee_sb_demo:latest 
 
+## 5. check if latest version was pushed
+https://hub.docker.com/repositories/apereznwogmail
+
 --------------------------
 --------------------------
 -- DOCUMENTATION
